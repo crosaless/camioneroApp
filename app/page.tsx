@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Truck, Calendar, MapPin } from "lucide-react"
+import { Plus, Truck, Calendar, MapPin, Cloud } from "lucide-react"
 
 interface Viaje {
   id: string
@@ -45,6 +45,12 @@ export default function HomePage() {
             <Truck className="w-8 h-8 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Mis Viajes</h1>
           </div>
+          <Link href="/backup">
+            <Button variant="outline" size="sm">
+              <Cloud className="w-4 h-4 mr-1" />
+              Backup
+            </Button>
+          </Link>
         </div>
 
         <Link href="/nuevo-viaje">
