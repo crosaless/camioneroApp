@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Truck, Calendar, MapPin, Cloud } from "lucide-react"
+import { Plus, Truck, Calendar, MapPin, Archive, ArchiveRestore, Eye } from "lucide-react"
 
 interface Viaje {
   id: string
@@ -12,17 +12,26 @@ interface Viaje {
   viaticos?: any[]
   finalizado: boolean
   registros: any[]
+  archivado?: boolean
 }
 
 export default function HomePage() {
   const [viajes, setViajes] = useState<Viaje[]>([])
+  const [mostrarArchivados, setMostrarArchivados] = useState(false)
 
   useEffect(() => {
+    // Cargar viajes solo una vez al montar el componente
     const viajesGuardados = localStorage.getItem("viajes")
     if (viajesGuardados) {
-      setViajes(JSON.parse(viajesGuardados))
+      try {
+        const viajesParsed = JSON.parse(viajesGuardados)
+        setViajes(viajesParsed)
+      } catch (error) {
+        console.error("Error parsing viajes:", error)
+        setViajes([])
+      }
     }
-  }, [])
+  }, []) // Array de dependencias vacío para que solo se ejecute una vez
 
   const formatearFecha = (fecha: string) => {
     return new Date(fecha).toLocaleDateString("es-ES", {
@@ -34,8 +43,24 @@ export default function HomePage() {
 
   const obtenerUltimoDestino = (viaje: Viaje) => {
     const registroDestino = viaje.registros.filter((r) => r.tipo === "origen-destino").pop()
-    return registroDestino?.destino || "Sin destino"
+    return registroDestino?.datos?.destino || "Sin destino"
   }
+
+  const archivarViaje = (viajeId: string) => {
+    const viajesActualizados = viajes.map((viaje) => (viaje.id === viajeId ? { ...viaje, archivado: true } : viaje))
+    setViajes(viajesActualizados)
+    localStorage.setItem("viajes", JSON.stringify(viajesActualizados))
+  }
+
+  const desarchivarViaje = (viajeId: string) => {
+    const viajesActualizados = viajes.map((viaje) => (viaje.id === viajeId ? { ...viaje, archivado: false } : viaje))
+    setViajes(viajesActualizados)
+    localStorage.setItem("viajes", JSON.stringify(viajesActualizados))
+  }
+
+  const viajesActivos = viajes.filter((viaje) => !viaje.archivado)
+  const viajesArchivados = viajes.filter((viaje) => viaje.archivado)
+  const viajesAMostrar = mostrarArchivados ? viajesArchivados : viajesActivos
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -45,37 +70,72 @@ export default function HomePage() {
             <Truck className="w-8 h-8 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">Mis Viajes</h1>
           </div>
-          <Link href="/backup">
-            <Button variant="outline" size="sm">
-              <Cloud className="w-4 h-4 mr-1" />
-              Backup
-            </Button>
-          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setMostrarArchivados(!mostrarArchivados)}
+            className="flex items-center gap-1"
+          >
+            {mostrarArchivados ? (
+              <>
+                <Eye className="w-4 h-4" />
+                <span className="hidden sm:inline">Activos</span>
+              </>
+            ) : (
+              <>
+                <Archive className="w-4 h-4" />
+                <span className="hidden sm:inline">Archivados</span>
+              </>
+            )}
+          </Button>
         </div>
 
-        <Link href="/nuevo-viaje">
-          <Button className="w-full mb-6 h-14 text-lg" size="lg">
-            <Plus className="w-6 h-6 mr-2" />
-            Nuevo Viaje
-          </Button>
-        </Link>
+        {!mostrarArchivados && (
+          <Link href="/nuevo-viaje">
+            <Button className="w-full mb-6 h-14 text-lg" size="lg">
+              <Plus className="w-6 h-6 mr-2" />
+              Nuevo Viaje
+            </Button>
+          </Link>
+        )}
+
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">{mostrarArchivados ? "Viajes Archivados" : "Viajes Activos"}</h2>
+          <span className="text-sm text-gray-500">
+            {viajesAMostrar.length} {viajesAMostrar.length === 1 ? "viaje" : "viajes"}
+          </span>
+        </div>
 
         <div className="space-y-4">
-          {viajes.length === 0 ? (
+          {viajesAMostrar.length === 0 ? (
             <Card>
               <CardContent className="p-6 text-center">
-                <Truck className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No tienes viajes registrados</p>
-                <p className="text-sm text-gray-400 mt-2">Crea tu primer viaje para comenzar</p>
+                {mostrarArchivados ? (
+                  <>
+                    <Archive className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No tienes viajes archivados</p>
+                    <p className="text-sm text-gray-400 mt-2">
+                      Los viajes finalizados aparecerán aquí cuando los archives
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Truck className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No tienes viajes activos</p>
+                    <p className="text-sm text-gray-400 mt-2">Crea tu primer viaje para comenzar</p>
+                  </>
+                )}
               </CardContent>
             </Card>
           ) : (
-            viajes.map((viaje) => (
-              <Link key={viaje.id} href={`/viaje/${viaje.id}`}>
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
+            viajesAMostrar.map((viaje) => (
+              <Card key={viaje.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <Link href={`/viaje/${viaje.id}`} className="flex-1">
                       <CardTitle className="text-lg">Viaje #{viaje.id.slice(-4)}</CardTitle>
+                    </Link>
+                    <div className="flex items-center gap-2">
                       <div
                         className={`px-3 py-1 rounded-full text-xs font-medium ${
                           viaje.finalizado ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
@@ -83,8 +143,26 @@ export default function HomePage() {
                       >
                         {viaje.finalizado ? "Finalizado" : "En curso"}
                       </div>
+                      {viaje.finalizado && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            if (mostrarArchivados) {
+                              desarchivarViaje(viaje.id)
+                            } else {
+                              archivarViaje(viaje.id)
+                            }
+                          }}
+                        >
+                          {mostrarArchivados ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                        </Button>
+                      )}
                     </div>
-                  </CardHeader>
+                  </div>
+                </CardHeader>
+                <Link href={`/viaje/${viaje.id}`}>
                   <CardContent>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -100,7 +178,7 @@ export default function HomePage() {
                         <div className="text-sm text-gray-500">
                           Viáticos:{" "}
                           {viaje.viaticos
-                            .map((v, i) => {
+                            .map((v) => {
                               const monedaInfo = [
                                 { codigo: "ARS", simbolo: "$" },
                                 { codigo: "USD", simbolo: "US$" },
@@ -113,11 +191,22 @@ export default function HomePage() {
                       )}
                     </div>
                   </CardContent>
-                </Card>
-              </Link>
+                </Link>
+              </Card>
             ))
           )}
         </div>
+
+        {/* Información sobre archivado */}
+        {!mostrarArchivados && viajesArchivados.length > 0 && (
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+            <h3 className="font-semibold text-blue-900 mb-2">📁 Viajes Archivados</h3>
+            <p className="text-sm text-blue-800">
+              Tienes {viajesArchivados.length} {viajesArchivados.length === 1 ? "viaje archivado" : "viajes archivados"}
+              . Usa el botón de archivo para verlos.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

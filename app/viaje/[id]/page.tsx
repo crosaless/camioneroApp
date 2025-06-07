@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ChevronRight,
   Settings,
+  Trash2,
 } from "lucide-react"
 import { RegistroForm } from "@/components/registro-form"
 import { CotizacionesForm } from "@/components/cotizaciones-form"
@@ -266,6 +267,16 @@ export default function DetalleViajePage() {
     }
   }
 
+  const eliminarRegistro = (registroId: string) => {
+    if (window.confirm("¿Estás seguro de que quieres eliminar este registro?")) {
+      const viajeActualizado = {
+        ...viaje,
+        registros: viaje.registros.filter((r) => r.id !== registroId),
+      }
+      guardarViaje(viajeActualizado)
+    }
+  }
+
   const descargarPDF = () => {
     if (viaje) {
       generarPDF(viaje, calcularTotalesPorMoneda(), monedas)
@@ -329,14 +340,19 @@ export default function DetalleViajePage() {
                 <Calculator className="w-5 h-5 text-blue-600" />
                 Resumen Financiero
               </CardTitle>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setMostrarCotizaciones(true)}>
-                  <Settings className="w-4 h-4 mr-1" />
-                  Cotizaciones
+              <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMostrarCotizaciones(true)}
+                  className="text-xs px-2 py-1"
+                >
+                  <Settings className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Cotizaciones</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={descargarPDF}>
-                  <Download className="w-4 h-4 mr-1" />
-                  PDF
+                <Button variant="outline" size="sm" onClick={descargarPDF} className="text-xs px-2 py-1">
+                  <Download className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+                  <span className="hidden sm:inline">PDF</span>
                 </Button>
               </div>
             </div>
@@ -491,14 +507,22 @@ export default function DetalleViajePage() {
                   <CardHeader className="pb-2">
                     <div className="flex items-center gap-2">
                       <Icono className="w-5 h-5 text-blue-600" />
-                      <CardTitle className="text-base">
+                      <CardTitle className="text-base flex-1">
                         {tiposRegistro.find((t) => t.tipo === registro.tipo)?.nombre}
                       </CardTitle>
-                      <div className="ml-auto flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <Button variant="ghost" size="sm" onClick={() => editarRegistro(registro)}>
                           <Edit className="w-4 h-4" />
                         </Button>
-                        <div className="text-xs text-gray-500">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => eliminarRegistro(registro.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                        <div className="text-xs text-gray-500 ml-2">
                           {registro.fecha} - {registro.hora}
                         </div>
                       </div>

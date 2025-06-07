@@ -51,9 +51,18 @@ export default function NuevoViajePage() {
       viaticos: viaticosValidos,
       finalizado: false,
       registros: [],
+      archivado: false,
     }
 
     const viajesExistentes = JSON.parse(localStorage.getItem("viajes") || "[]")
+
+    // Verificar que no exista ya un viaje con el mismo ID
+    const viajeExiste = viajesExistentes.find((v: any) => v.id === nuevoViaje.id)
+    if (viajeExiste) {
+      // Si existe, generar un nuevo ID
+      nuevoViaje.id = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    }
+
     const viajesActualizados = [...viajesExistentes, nuevoViaje]
     localStorage.setItem("viajes", JSON.stringify(viajesActualizados))
 

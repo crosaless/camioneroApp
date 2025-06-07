@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowLeft, Cloud, Download, Upload, CheckCircle, AlertCircle, Loader2, Smartphone } from "lucide-react"
-import { BackupService } from "@/lib/backup-service"
+import { uploadToCloud, downloadFromCloud, getAuthUrl } from "@/app/actions/backup-actions"
 
 interface BackupStatus {
   connected: boolean
@@ -52,14 +52,34 @@ export default function BackupPage() {
   const conectarGoogleDrive = async () => {
     setLoading(true)
     try {
-      await BackupService.connectGoogleDrive()
-      const newStatus = {
-        ...backupStatus,
-        connected: true,
-        provider: "google" as const,
+      const authUrl = await getAuthUrl("google")
+
+      // Abrir ventana de autenticación
+      const authWindow = window.open(authUrl, "auth", "width=500,height=600")
+
+      // Escuchar el mensaje de la ventana de autenticación
+      const handleMessage = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return
+
+        if (event.data.type === "AUTH_SUCCESS" && event.data.provider === "google") {
+          const newStatus = {
+            ...backupStatus,
+            connected: true,
+            provider: "google" as const,
+          }
+          saveBackupStatus(newStatus)
+          localStorage.setItem("google_access_token", event.data.token)
+          showMessage("success", "Conectado a Google Drive exitosamente")
+          authWindow?.close()
+          window.removeEventListener("message", handleMessage)
+        } else if (event.data.type === "AUTH_ERROR") {
+          showMessage("error", "Error al conectar con Google Drive")
+          authWindow?.close()
+          window.removeEventListener("message", handleMessage)
+        }
       }
-      saveBackupStatus(newStatus)
-      showMessage("success", "Conectado a Google Drive exitosamente")
+
+      window.addEventListener("message", handleMessage)
     } catch (error) {
       showMessage("error", "Error al conectar con Google Drive")
     }
@@ -69,14 +89,34 @@ export default function BackupPage() {
   const conectarDropbox = async () => {
     setLoading(true)
     try {
-      await BackupService.connectDropbox()
-      const newStatus = {
-        ...backupStatus,
-        connected: true,
-        provider: "dropbox" as const,
+      const authUrl = await getAuthUrl("dropbox")
+
+      // Abrir ventana de autenticación
+      const authWindow = window.open(authUrl, "auth", "width=500,height=600")
+
+      // Escuchar el mensaje de la ventana de autenticación
+      const handleMessage = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return
+
+        if (event.data.type === "AUTH_SUCCESS" && event.data.provider === "dropbox") {
+          const newStatus = {
+            ...backupStatus,
+            connected: true,
+            provider: "dropbox" as const,
+          }
+          saveBackupStatus(newStatus)
+          localStorage.setItem("dropbox_access_token", event.data.token)
+          showMessage("success", "Conectado a Dropbox exitosamente")
+          authWindow?.close()
+          window.removeEventListener("message", handleMessage)
+        } else if (event.data.type === "AUTH_ERROR") {
+          showMessage("error", "Error al conectar con Dropbox")
+          authWindow?.close()
+          window.removeEventListener("message", handleMessage)
+        }
       }
-      saveBackupStatus(newStatus)
-      showMessage("success", "Conectado a Dropbox exitosamente")
+
+      window.addEventListener("message", handleMessage)
     } catch (error) {
       showMessage("error", "Error al conectar con Dropbox")
     }
@@ -84,7 +124,8 @@ export default function BackupPage() {
   }
 
   const desconectar = () => {
-    BackupService.disconnect()
+    localStorage.removeItem("google_access_token")
+    localStorage.removeItem("dropbox_access_token")
     const newStatus = {
       connected: false,
       provider: null,
@@ -101,14 +142,24 @@ export default function BackupPage() {
     setLoading(true)
     try {
       const viajesData = localStorage.getItem("viajes") || "[]"
-      await BackupService.uploadData(viajesData, backupStatus.provider)
+      const token = localStorage.getItem(`${backupStatus.provider}_access_token`)
 
-      const newStatus = {
-        ...backupStatus,
-        lastSync: new Date().toISOString(),
+      if (!token) {
+        throw new Error("No hay token de acceso")
       }
-      saveBackupStatus(newStatus)
-      showMessage("success", "Datos subidos exitosamente a la nube")
+
+      const result = await uploadToCloud(viajesData, backupStatus.provider, token)
+
+      if (result.success) {
+        const newStatus = {
+          ...backupStatus,
+          lastSync: new Date().toISOString(),
+        }
+        saveBackupStatus(newStatus)
+        showMessage("success", "Datos subidos exitosamente a la nube")
+      } else {
+        showMessage("error", result.error || "Error al subir datos")
+      }
     } catch (error) {
       showMessage("error", "Error al subir datos a la nube")
     }
@@ -120,16 +171,23 @@ export default function BackupPage() {
 
     setLoading(true)
     try {
-      const data = await BackupService.downloadData(backupStatus.provider)
-      if (data) {
+      const token = localStorage.getItem(`${backupStatus.provider}_access_token`)
+
+      if (!token) {
+        throw new Error("No hay token de acceso")
+      }
+
+      const result = await downloadFromCloud(backupStatus.provider, token)
+
+      if (result.success && result.data) {
         // Mostrar confirmación antes de sobrescribir
         const confirmar = window.confirm(
           "¿Estás seguro de que quieres reemplazar tus datos locales con los datos de la nube? Esta acción no se puede deshacer.",
         )
 
         if (confirmar) {
-          localStorage.setItem("viajes", data)
-          setViajes(JSON.parse(data))
+          localStorage.setItem("viajes", result.data)
+          setViajes(JSON.parse(result.data))
           const newStatus = {
             ...backupStatus,
             lastSync: new Date().toISOString(),
@@ -138,7 +196,7 @@ export default function BackupPage() {
           showMessage("success", "Datos descargados exitosamente desde la nube")
         }
       } else {
-        showMessage("error", "No se encontraron datos en la nube")
+        showMessage("error", result.error || "No se encontraron datos en la nube")
       }
     } catch (error) {
       showMessage("error", "Error al descargar datos desde la nube")
@@ -156,10 +214,16 @@ export default function BackupPage() {
     if (newStatus.autoSync) {
       showMessage("success", "Sincronización automática activada")
       // Configurar sincronización automática cada 5 minutos
-      BackupService.enableAutoSync(newStatus.provider!)
+      setInterval(
+        async () => {
+          if (newStatus.provider) {
+            await subirDatos()
+          }
+        },
+        5 * 60 * 1000,
+      )
     } else {
       showMessage("success", "Sincronización automática desactivada")
-      BackupService.disableAutoSync()
     }
   }
 
