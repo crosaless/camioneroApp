@@ -65,6 +65,7 @@ export default function DetalleViajePage() {
   const [tipoRegistro, setTipoRegistro] = useState("")
   const [registroEditando, setRegistroEditando] = useState<Registro | null>(null)
   const [gastosExpandidos, setGastosExpandidos] = useState<{ [moneda: string]: boolean }>({})
+  const [gastosConvertidosExpandidos, setGastosConvertidosExpandidos] = useState(false)
 
   const monedas = [
     { codigo: "ARS", nombre: "Pesos Argentinos", simbolo: "$" },
@@ -170,7 +171,7 @@ export default function DetalleViajePage() {
     { tipo: "descripcion", nombre: "Descripción General", icono: FileText },
     { tipo: "origen-destino", nombre: "Origen y Destino", icono: MapPin },
     { tipo: "kilometros", nombre: "Kilómetros", icono: Gauge },
-    { tipo: "rendicion", nombre: "Rendición", icono: DollarSign },
+    { tipo: "ingreso", nombre: "Ingreso de Dinero", icono: DollarSign },
     { tipo: "parada", nombre: "Parada Intermedia", icono: Navigation },
     { tipo: "combustible", nombre: "Carga Combustible", icono: Fuel },
     { tipo: "gasto", nombre: "Gasto Varios", icono: DollarSign },
@@ -194,7 +195,7 @@ export default function DetalleViajePage() {
   const calcularTotalesPorMoneda = () => {
     const totales: { [moneda: string]: { viaticos: number; ingresos: number; gastos: number; diferencia: number } } = {}
 
-    // Inicializar con viáticos
+    // Inicializar con adelantos
     viaje?.viaticos?.forEach((viatico) => {
       if (!totales[viatico.moneda]) {
         totales[viatico.moneda] = { viaticos: 0, ingresos: 0, gastos: 0, diferencia: 0 }
@@ -202,7 +203,7 @@ export default function DetalleViajePage() {
       totales[viatico.moneda].viaticos += viatico.monto
     })
 
-    // Calcular ingresos y gastos por moneda
+    // Calcular ingresos y gastos por moneda (excluyendo combustible)
     viaje?.registros.forEach((registro) => {
       const moneda = registro.datos.moneda || "ARS"
 
@@ -210,13 +211,11 @@ export default function DetalleViajePage() {
         totales[moneda] = { viaticos: 0, ingresos: 0, gastos: 0, diferencia: 0 }
       }
 
-      if (registro.tipo === "rendicion") {
+      if (registro.tipo === "ingreso") {
         totales[moneda].ingresos += Number.parseFloat(registro.datos.monto) || 0
-      } else if (registro.tipo === "combustible" || registro.tipo === "gasto") {
-        const monto =
-          registro.tipo === "combustible"
-            ? Number.parseFloat(registro.datos.costo) || 0
-            : Number.parseFloat(registro.datos.monto) || 0
+      } else if (registro.tipo === "gasto") {
+        // Solo gastos varios, NO combustible
+        const monto = Number.parseFloat(registro.datos.monto) || 0
         totales[moneda].gastos += monto
       }
     })
@@ -231,29 +230,33 @@ export default function DetalleViajePage() {
 
   const calcularTotalesConvertidos = () => {
     const totalesPorMoneda = calcularTotalesPorMoneda()
-    let viaticosTotal = 0
+    let adelantosTotal = 0
     let ingresosTotal = 0
     let gastosTotal = 0
 
     Object.entries(totalesPorMoneda).forEach(([moneda, totales]) => {
-      viaticosTotal += convertirAMonedaBase(totales.viaticos, moneda)
+      adelantosTotal += convertirAMonedaBase(totales.viaticos, moneda)
       ingresosTotal += convertirAMonedaBase(totales.ingresos, moneda)
       gastosTotal += convertirAMonedaBase(totales.gastos, moneda)
     })
 
     return {
-      viaticos: viaticosTotal,
+      adelantos: adelantosTotal,
       ingresos: ingresosTotal,
       gastos: gastosTotal,
-      diferencia: viaticosTotal + ingresosTotal - gastosTotal,
+      diferencia: adelantosTotal + ingresosTotal - gastosTotal,
     }
   }
 
   const obtenerGastosPorMoneda = (moneda: string) => {
     return viaje?.registros.filter((r) => {
       const registroMoneda = r.datos.moneda || "ARS"
-      return registroMoneda === moneda && (r.tipo === "combustible" || r.tipo === "gasto")
+      return registroMoneda === moneda && r.tipo === "gasto" // Solo gastos varios, NO combustible
     })
+  }
+
+  const obtenerTodosLosGastos = () => {
+    return viaje?.registros.filter((r) => r.tipo === "gasto") || []
   }
 
   const scrollToRegistro = (registroId: string) => {
@@ -279,7 +282,7 @@ export default function DetalleViajePage() {
 
   const descargarPDF = () => {
     if (viaje) {
-      generarPDF(viaje, calcularTotalesPorMoneda(), monedas)
+      generarPDF(viaje, calcularTotalesPorMoneda(), monedas, calcularTotalesConvertidos())
     }
   }
 
@@ -325,7 +328,9 @@ export default function DetalleViajePage() {
           </Link>
           <div>
             <h1 className="text-xl font-bold text-gray-900">Viaje #{viaje.id.slice(-4)}</h1>
-            <p className="text-sm text-gray-500">Iniciado: {new Date(viaje.fechaInicio).toLocaleDateString("es-ES")}</p>
+            <p className="text-sm text-gray-500">
+              Iniciado: {new Date(viaje.fechaInicio + "T00:00:00").toLocaleDateString("es-ES")}
+            </p>
           </div>
           <Badge variant={viaje.finalizado ? "default" : "secondary"} className="ml-auto">
             {viaje.finalizado ? "Finalizado" : "En curso"}
@@ -363,22 +368,58 @@ export default function DetalleViajePage() {
               <h4 className="font-semibold text-sm mb-2 text-green-800">💰 Total en Pesos Argentinos</h4>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span>Viáticos totales:</span>
-                  <span className="font-medium">${totalesConvertidos.viaticos.toFixed(2)}</span>
+                  <span>Adelantos totales:</span>
+                  <span className="font-medium">${totalesConvertidos.adelantos.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Ingresos totales:</span>
                   <span className="font-medium text-green-600">+${totalesConvertidos.ingresos.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Gastos totales:</span>
-                  <span className="font-medium text-red-600">-${totalesConvertidos.gastos.toFixed(2)}</span>
-                </div>
+
+                {/* Gastos Expandibles en Total Convertido */}
+                <Collapsible open={gastosConvertidosExpandidos} onOpenChange={setGastosConvertidosExpandidos}>
+                  <CollapsibleTrigger asChild>
+                    <div className="flex justify-between items-center cursor-pointer hover:bg-gray-100 p-1 rounded">
+                      <span className="flex items-center gap-1">
+                        Gastos totales:
+                        {gastosConvertidosExpandidos ? (
+                          <ChevronDown className="w-3 h-3" />
+                        ) : (
+                          <ChevronRight className="w-3 h-3" />
+                        )}
+                      </span>
+                      <span className="font-medium text-red-600">-${totalesConvertidos.gastos.toFixed(2)}</span>
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="ml-4 mt-1 space-y-1">
+                    {obtenerTodosLosGastos().map((gasto) => {
+                      const montoConvertido = convertirAMonedaBase(
+                        Number.parseFloat(gasto.datos.monto) || 0,
+                        gasto.datos.moneda || "ARS",
+                      )
+                      const simboloOriginal = obtenerSimboloMoneda(gasto.datos.moneda || "ARS")
+                      return (
+                        <div
+                          key={gasto.id}
+                          className="flex justify-between text-xs cursor-pointer hover:bg-gray-100 p-1 rounded"
+                          onClick={() => scrollToRegistro(gasto.id)}
+                        >
+                          <span>
+                            💳 {gasto.datos.concepto} ({simboloOriginal}
+                            {gasto.datos.monto})
+                          </span>
+                          <span>-${montoConvertido.toFixed(2)}</span>
+                        </div>
+                      )
+                    })}
+                  </CollapsibleContent>
+                </Collapsible>
+
                 <hr className="my-1" />
                 <div className="flex justify-between font-bold text-base">
-                  <span>DIFERENCIA TOTAL:</span>
+                  <span>DESCONTAR DEL SUELDO:</span>
                   <span className={`${totalesConvertidos.diferencia >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    ${totalesConvertidos.diferencia.toFixed(2)}
+                    ${Math.abs(totalesConvertidos.diferencia).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -392,7 +433,7 @@ export default function DetalleViajePage() {
                 </h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span>Viáticos:</span>
+                    <span>Adelantos:</span>
                     <span className="font-medium">
                       {obtenerSimboloMoneda(moneda)}
                       {totales.viaticos.toFixed(2)}
@@ -406,7 +447,7 @@ export default function DetalleViajePage() {
                     </span>
                   </div>
 
-                  {/* Gastos Expandibles */}
+                  {/* Gastos Expandibles por Moneda */}
                   <Collapsible
                     open={gastosExpandidos[moneda]}
                     onOpenChange={(open) => setGastosExpandidos({ ...gastosExpandidos, [moneda]: open })}
@@ -434,10 +475,10 @@ export default function DetalleViajePage() {
                           className="flex justify-between text-xs cursor-pointer hover:bg-gray-100 p-1 rounded"
                           onClick={() => scrollToRegistro(gasto.id)}
                         >
-                          <span>{gasto.tipo === "combustible" ? "🚛 Combustible" : "💳 " + gasto.datos.concepto}</span>
+                          <span>💳 {gasto.datos.concepto}</span>
                           <span>
                             -{obtenerSimboloMoneda(moneda)}
-                            {gasto.tipo === "combustible" ? gasto.datos.costo : gasto.datos.monto}
+                            {gasto.datos.monto}
                           </span>
                         </div>
                       ))}
@@ -546,7 +587,7 @@ export default function DetalleViajePage() {
                           <strong>Kilómetros:</strong> {registro.datos.kilometros} km
                         </p>
                       )}
-                      {registro.tipo === "rendicion" && (
+                      {registro.tipo === "ingreso" && (
                         <div>
                           <p>
                             <strong>Monto:</strong> {obtenerSimboloMoneda(registro.datos.moneda || "ARS")}

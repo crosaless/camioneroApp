@@ -47,7 +47,7 @@ export function RegistroForm({ tipo, registroInicial, onGuardar, onCancelar }: R
       descripcion: "Descripción General",
       "origen-destino": "Origen y Destino",
       kilometros: "Kilómetros Recorridos",
-      rendicion: "Rendición Esperada",
+      ingreso: "Ingreso de Dinero",
       parada: "Parada Intermedia",
       combustible: "Carga de Combustible",
       gasto: "Gasto Varios",
@@ -56,7 +56,7 @@ export function RegistroForm({ tipo, registroInicial, onGuardar, onCancelar }: R
     return registroInicial ? `Editar ${titulo}` : titulo
   }
 
-  const requiereMoneda = ["rendicion", "combustible", "gasto"].includes(tipo)
+  const requiereMoneda = ["ingreso", "combustible", "gasto"].includes(tipo)
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -127,7 +127,7 @@ export function RegistroForm({ tipo, registroInicial, onGuardar, onCancelar }: R
                 </div>
               )}
 
-              {tipo === "rendicion" && (
+              {tipo === "ingreso" && (
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="moneda">Moneda</Label>
@@ -145,7 +145,7 @@ export function RegistroForm({ tipo, registroInicial, onGuardar, onCancelar }: R
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="monto">Monto Esperado</Label>
+                    <Label htmlFor="monto">Monto del Ingreso</Label>
                     <Input
                       id="monto"
                       type="number"
@@ -265,7 +265,7 @@ export function RegistroForm({ tipo, registroInicial, onGuardar, onCancelar }: R
                     <Label htmlFor="concepto">Concepto del Gasto</Label>
                     <Input
                       id="concepto"
-                      placeholder="Comida, peaje, reparación, etc."
+                      placeholder="Comida, peaje, reparación, devuelto, etc."
                       className="h-12"
                       value={datos.concepto || ""}
                       onChange={(e) => actualizarDato("concepto", e.target.value)}

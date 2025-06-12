@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Truck, Calendar, MapPin, Archive, ArchiveRestore, Eye } from "lucide-react"
+import { Plus, Truck, Calendar, MapPin, Archive, ArchiveRestore, Eye, Trash2 } from "lucide-react"
 
 interface Viaje {
   id: string
@@ -34,7 +34,7 @@ export default function HomePage() {
   }, []) // Array de dependencias vacío para que solo se ejecute una vez
 
   const formatearFecha = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString("es-ES", {
+    return new Date(fecha + "T00:00:00").toLocaleDateString("es-ES", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -56,6 +56,18 @@ export default function HomePage() {
     const viajesActualizados = viajes.map((viaje) => (viaje.id === viajeId ? { ...viaje, archivado: false } : viaje))
     setViajes(viajesActualizados)
     localStorage.setItem("viajes", JSON.stringify(viajesActualizados))
+  }
+
+  const eliminarViajeArchivado = (viajeId: string) => {
+    if (
+      window.confirm(
+        "¿Estás seguro de que quieres eliminar permanentemente este viaje? Esta acción no se puede deshacer.",
+      )
+    ) {
+      const viajesActualizados = viajes.filter((viaje) => viaje.id !== viajeId)
+      setViajes(viajesActualizados)
+      localStorage.setItem("viajes", JSON.stringify(viajesActualizados))
+    }
   }
 
   const viajesActivos = viajes.filter((viaje) => !viaje.archivado)
@@ -144,20 +156,39 @@ export default function HomePage() {
                         {viaje.finalizado ? "Finalizado" : "En curso"}
                       </div>
                       {viaje.finalizado && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            if (mostrarArchivados) {
-                              desarchivarViaje(viaje.id)
-                            } else {
-                              archivarViaje(viaje.id)
-                            }
-                          }}
-                        >
-                          {mostrarArchivados ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              if (mostrarArchivados) {
+                                desarchivarViaje(viaje.id)
+                              } else {
+                                archivarViaje(viaje.id)
+                              }
+                            }}
+                          >
+                            {mostrarArchivados ? (
+                              <ArchiveRestore className="w-4 h-4" />
+                            ) : (
+                              <Archive className="w-4 h-4" />
+                            )}
+                          </Button>
+                          {mostrarArchivados && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                eliminarViajeArchivado(viaje.id)
+                              }}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -176,7 +207,7 @@ export default function HomePage() {
                       <div className="text-sm text-gray-500">{viaje.registros.length} registros</div>
                       {viaje.viaticos && viaje.viaticos.length > 0 && (
                         <div className="text-sm text-gray-500">
-                          Viáticos:{" "}
+                          Adelantos:{" "}
                           {viaje.viaticos
                             .map((v) => {
                               const monedaInfo = [

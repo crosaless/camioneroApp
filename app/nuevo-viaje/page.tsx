@@ -47,7 +47,7 @@ export default function NuevoViajePage() {
 
     const nuevoViaje = {
       id: Date.now().toString(),
-      fechaInicio,
+      fechaInicio: fechaInicio, // Ya está en formato correcto YYYY-MM-DD
       viaticos: viaticosValidos,
       finalizado: false,
       registros: [],
@@ -102,7 +102,7 @@ export default function NuevoViajePage() {
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label>Viáticos por Moneda</Label>
+                <Label>Adelantos por Moneda</Label>
                 <Button type="button" variant="outline" size="sm" onClick={agregarViatico}>
                   <Plus className="w-4 h-4 mr-1" />
                   Agregar

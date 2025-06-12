@@ -17,13 +17,25 @@ interface TotalesPorMoneda {
   }
 }
 
+interface TotalesConvertidos {
+  adelantos: number
+  ingresos: number
+  gastos: number
+  diferencia: number
+}
+
 interface Moneda {
   codigo: string
   nombre: string
   simbolo: string
 }
 
-export function generarPDF(viaje: Viaje, totalesPorMoneda: TotalesPorMoneda, monedas: Moneda[]) {
+export function generarPDF(
+  viaje: Viaje,
+  totalesPorMoneda: TotalesPorMoneda,
+  monedas: Moneda[],
+  totalesConvertidos: TotalesConvertidos,
+) {
   const doc = new jsPDF()
   let yPosition = 20
 
@@ -47,16 +59,37 @@ export function generarPDF(viaje: Viaje, totalesPorMoneda: TotalesPorMoneda, mon
   yPosition += 5
   doc.setFontSize(12)
   doc.setFont("helvetica", "normal")
-  yPosition = addText(`Fecha de inicio: ${new Date(viaje.fechaInicio).toLocaleDateString("es-ES")}`, 20, yPosition)
+  yPosition = addText(
+    `Fecha de inicio: ${new Date(viaje.fechaInicio + "T00:00:00").toLocaleDateString("es-ES")}`,
+    20,
+    yPosition,
+  )
   yPosition = addText(`Estado: ${viaje.finalizado ? "Finalizado" : "En curso"}`, 20, yPosition)
   yPosition = addText(`Fecha de reporte: ${new Date().toLocaleDateString("es-ES")}`, 20, yPosition)
 
   yPosition += 10
 
-  // Resumen Financiero
+  // Total en Pesos Argentinos
   doc.setFontSize(14)
   doc.setFont("helvetica", "bold")
-  yPosition = addText("RESUMEN FINANCIERO", 20, yPosition)
+  yPosition = addText("💰 TOTAL EN PESOS ARGENTINOS", 20, yPosition)
+  yPosition += 5
+
+  doc.setFontSize(10)
+  doc.setFont("helvetica", "normal")
+  yPosition = addText(`Adelantos totales: $${totalesConvertidos.adelantos.toFixed(2)}`, 20, yPosition)
+  yPosition = addText(`Ingresos totales: $${totalesConvertidos.ingresos.toFixed(2)}`, 20, yPosition)
+  yPosition = addText(`Gastos totales: $${totalesConvertidos.gastos.toFixed(2)}`, 20, yPosition)
+
+  doc.setFont("helvetica", "bold")
+  yPosition = addText(`DESCONTAR DEL SUELDO: $${Math.abs(totalesConvertidos.diferencia).toFixed(2)}`, 20, yPosition)
+  doc.setFont("helvetica", "normal")
+  yPosition += 5
+
+  // Resumen Financiero por Moneda
+  doc.setFontSize(14)
+  doc.setFont("helvetica", "bold")
+  yPosition = addText("RESUMEN POR MONEDA", 20, yPosition)
   yPosition += 5
 
   doc.setFontSize(10)
@@ -67,9 +100,9 @@ export function generarPDF(viaje: Viaje, totalesPorMoneda: TotalesPorMoneda, mon
     const simbolo = monedaInfo?.simbolo || "$"
 
     yPosition = addText(`${simbolo} ${monedaInfo?.nombre || moneda}:`, 20, yPosition)
-    yPosition = addText(`  Viáticos iniciales: ${simbolo}${totales.viaticos.toFixed(2)}`, 25, yPosition)
-    yPosition = addText(`  Ingresos esperados: ${simbolo}${totales.ingresos.toFixed(2)}`, 25, yPosition)
-    yPosition = addText(`  Total gastos: ${simbolo}${totales.gastos.toFixed(2)}`, 25, yPosition)
+    yPosition = addText(`  Adelantos iniciales: ${simbolo}${totales.viaticos.toFixed(2)}`, 25, yPosition)
+    yPosition = addText(`  Ingresos: ${simbolo}${totales.ingresos.toFixed(2)}`, 25, yPosition)
+    yPosition = addText(`  Gastos varios: ${simbolo}${totales.gastos.toFixed(2)}`, 25, yPosition)
 
     doc.setFont("helvetica", "bold")
     const diferencia =
@@ -96,7 +129,7 @@ export function generarPDF(viaje: Viaje, totalesPorMoneda: TotalesPorMoneda, mon
     descripcion: "Descripción General",
     "origen-destino": "Origen y Destino",
     kilometros: "Kilómetros Recorridos",
-    rendicion: "Rendición Esperada",
+    ingreso: "Ingreso de Dinero",
     parada: "Parada Intermedia",
     combustible: "Carga de Combustible",
     gasto: "Gasto Varios",
@@ -128,9 +161,9 @@ export function generarPDF(viaje: Viaje, totalesPorMoneda: TotalesPorMoneda, mon
       case "kilometros":
         yPosition = addText(`   Kilómetros: ${registro.datos.kilometros} km`, 25, yPosition)
         break
-      case "rendicion":
-        const simboloRendicion = monedas.find((m) => m.codigo === (registro.datos.moneda || "ARS"))?.simbolo || "$"
-        yPosition = addText(`   Monto: ${simboloRendicion}${registro.datos.monto}`, 25, yPosition)
+      case "ingreso":
+        const simboloIngreso = monedas.find((m) => m.codigo === (registro.datos.moneda || "ARS"))?.simbolo || "$"
+        yPosition = addText(`   Monto: ${simboloIngreso}${registro.datos.monto}`, 25, yPosition)
         yPosition = addText(
           `   Moneda: ${monedas.find((m) => m.codigo === (registro.datos.moneda || "ARS"))?.nombre}`,
           25,
